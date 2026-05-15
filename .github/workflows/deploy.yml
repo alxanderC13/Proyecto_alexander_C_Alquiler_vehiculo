@@ -7,13 +7,25 @@ on:
     branches: [ main, master ]
 
 env:
-  # Corrige el aviso de depreciación obligando a usar Node 24 en las acciones antiguas
+  # Corrige el aviso de depreciación obligando a usar Node 24 en las acciones
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
 
   test:
     runs-on: ubuntu-latest
+
+    # Variables globales para el Job de pruebas (así decouple las lee correctamente)
+    env:
+      SECRET_KEY: test-secret-key-for-ci-only
+      DEBUG: True
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      DB_NAME: shopapi_test_db
+      DB_USER: shopapi_user
+      DB_PASSWORD: shopapi_pass_123
+      DB_HOST: localhost
+      DB_PORT: 5432
+      TEST_DB_NAME: shopapi_test_db
 
     services:
       postgres:
@@ -42,16 +54,6 @@ jobs:
       - run: uv sync
 
       - run: uv run python manage.py test store --verbosity=2
-        env:
-          SECRET_KEY: test-secret-key-for-ci-only
-          DEBUG: True
-          ALLOWED_HOSTS: localhost,127.0.0.1
-          DB_NAME: shopapi_test_db
-          DB_USER: shopapi_user
-          DB_PASSWORD: shopapi_pass_123
-          DB_HOST: localhost
-          DB_PORT: 5432
-          TEST_DB_NAME: shopapi_test_db
 
   deploy:
     needs: test
