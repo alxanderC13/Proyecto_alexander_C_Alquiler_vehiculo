@@ -1,28 +1,57 @@
-name: ShopAPI CI/CD DigitalOcean
+name: ShopAPI — CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  # Corrige el aviso de depreciación obligando a usar Node 24 en las acciones antiguas
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
 
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shopapi_test_db
+          POSTGRES_USER: shopapi_user
+          POSTGRES_PASSWORD: shopapi_pass_123
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
 
       - run: uv python install 3.12
 
       - run: uv sync
 
-      - run: uv run python manage.py test store
+      - run: uv run python manage.py test store --verbosity=2
         env:
-          SECRET_KEY: test
+          SECRET_KEY: test-secret-key-for-ci-only
           DEBUG: True
-          ALLOWED_HOSTS: localhost
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          DB_NAME: shopapi_test_db
+          DB_USER: shopapi_user
+          DB_PASSWORD: shopapi_pass_123
+          DB_HOST: localhost
+          DB_PORT: 5432
+          TEST_DB_NAME: shopapi_test_db
 
   deploy:
     needs: test
@@ -43,23 +72,28 @@ jobs:
           ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
             set -e
 
-            cd /opt/shopapi
+            cd ${{ secrets.DEPLOY_PATH }}
 
             echo "Pull latest code"
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
 
             echo "Install deps"
-            uv sync
+            uv sync --frozen
 
             echo "Migrate DB"
             uv run python manage.py migrate --noinput
 
             echo "Collect static"
-            uv run python manage.py collectstatic --noinput
+            uv run python manage.py collectstatic --noinput --clear
 
             echo "Restart services"
             sudo systemctl restart gunicorn-shopapi
             sudo systemctl restart nginx
+
+            echo "Verify API Health"
+            sleep 3
+            curl -sf http://127.0.0.1/api/health/ && echo "API OK" || echo "API ERROR"
 
             echo "Done"
           EOF
