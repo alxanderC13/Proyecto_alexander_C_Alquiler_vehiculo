@@ -1,0 +1,65 @@
+name: ShopAPI CI/CD DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - run: uv python install 3.12
+
+      - run: uv sync
+
+      - run: uv run python manage.py test store
+        env:
+          SECRET_KEY: test
+          DEBUG: True
+          ALLOWED_HOSTS: localhost
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: |
+          ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+
+            cd /opt/shopapi
+
+            echo "Pull latest code"
+            git pull origin main
+
+            echo "Install deps"
+            uv sync
+
+            echo "Migrate DB"
+            uv run python manage.py migrate --noinput
+
+            echo "Collect static"
+            uv run python manage.py collectstatic --noinput
+
+            echo "Restart services"
+            sudo systemctl restart gunicorn-shopapi
+            sudo systemctl restart nginx
+
+            echo "Done"
+          EOF
