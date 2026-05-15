@@ -53,7 +53,8 @@ jobs:
 
       - run: uv sync
 
-      - run: uv run python manage.py test store --verbosity=2
+      # Se añade --noinput para evitar que Django pregunte de forma interactiva si borra la BD
+      - run: uv run python manage.py test store --verbosity=2 --noinput
 
   deploy:
     needs: test
