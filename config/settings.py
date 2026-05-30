@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'corsheaders',
-    'store',
+    'rental',
 ]
 
 MIDDLEWARE = [
@@ -70,6 +70,8 @@ STATIC_URL         = '/static/'
 STATIC_ROOT        = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+AUTH_USER_MODEL = 'rental.Usuario'
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -82,7 +84,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'store.pagination.StandardPagination',
+    'DEFAULT_PAGINATION_CLASS': 'rental.pagination.StandardPagination',
     'PAGE_SIZE': 10,
 }
 
